@@ -10,6 +10,7 @@ import cors from 'cors';
 import axios from 'axios';
 import CryptoJS from 'crypto-js';
 import messagesRouter from './messages_process.js';
+import { CHARSToString } from './messages_process.js';
 
 // Carregar variáveis de ambiente
 dotenv.config();
@@ -159,15 +160,16 @@ app.get('/c/:number', async (req, res) => {
     
     // Gerar código único
     const uniqueCode = await generateUniqueCode(text);
+    const uniqueCodeString = await CHARSToString(uniqueCode);
     
     // Inserir no banco de dados
     const client = await pool.connect();
     try {
       const resultTracker = await client.query(
         `INSERT INTO tracker 
-         (number_destination, text, business_id, utm_campaign, utm_medium, utm_source, utm_content, unique_code, client_ip_address, client_user_agent) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-        [number, text, businessId, utmCampaign, utmMedium, utmSource, utmContent, uniqueCode, ip_user, userAgent]
+         (number_destination, text, business_id, utm_campaign, utm_medium, utm_source, utm_content, unique_code, client_ip_address, client_user_agent, unique_code_decoded) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [number, text, businessId, utmCampaign, utmMedium, utmSource, utmContent, uniqueCode, ip_user, userAgent, uniqueCodeString]
       );
       
       // Redirecionar para o WhatsApp
@@ -175,12 +177,14 @@ app.get('/c/:number', async (req, res) => {
       res.redirect(redirectUrl);
 
       try {
+        console.log('>>>> Mensagem:', text);
         const queryGetTrigger = await client.query(
           `SELECT * FROM router_tracker WHERE business_id = $1 AND message_trigger = $2`,
           [businessId, text]
         );
 
         if (queryGetTrigger.rows.length > 0) {
+          console.log('>>>> Trigger encontrado:', queryGetTrigger.rows[0]?.message_trigger);
           const createUserIdentifier = await client.query(
             `INSERT INTO tracker_user_identifier (business_id) VALUES ($1) RETURNING *`,
             [businessId]
@@ -251,6 +255,8 @@ app.get('/c/:number', async (req, res) => {
               console.error('Erro ao buscar dados do Pinterest:', error);
             }
           }
+        } else {
+          console.log('>>>> Trigger não encontrado:', text);
         }
       } catch (error) {
         console.error('Erro ao processar trigger:', error);

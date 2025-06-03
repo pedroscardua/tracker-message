@@ -98,6 +98,7 @@ const QUEUE_NAME = 'messages.upsert';
 // Função para consumir mensagens
 async function consumeMessages() {
     try {
+        if(process.env.PROCESS_MESSAGES === 'true'){
         const connection = await amqp.connect(RABBITMQ_URL);
         const channel = await connection.createChannel();
         
@@ -127,6 +128,7 @@ async function consumeMessages() {
                         }
                         console.log(`[x] Mensagem:`, message);
                         let messageCoded = message.data.message.conversation;
+                        console.log(`[x] Mensagem codificada:`, messageCoded);
                         let messageTrigger = removeZeroWidthChars(message.data.message.conversation);
                         // Remove apenas espaços U+0020 após o último caractere não-espaço
                         messageTrigger = messageTrigger.replace(/\s+$/g, '');
@@ -161,6 +163,17 @@ async function consumeMessages() {
                                             `UPDATE tracker SET whatsapp_id = $1 WHERE business_id = $2 AND unique_code = $3 RETURNING *`,
                                             [message.data.key.remoteJid, queryGetInstance.rows[0].business_id, messageCoded]
                                         );
+                                        const findTracker = await client.query(
+                                            `SELECT * FROM tracker WHERE business_id = $1 AND unique_code = $2`,
+                                            [queryGetInstance.rows[0].business_id, messageCoded]
+                                        );
+                                        const findTrackerString = CHARSToString(messageCoded);
+                                        console.log(`[x] Tracker encontrada:`, findTrackerString);
+
+                                        console.log(`[x] whatsapp_id:`, message.data.key.remoteJid);
+                                        console.log(`[x] business_id:`, queryGetInstance.rows[0].business_id);
+                                        console.log(`[x] unique_code:`, messageCoded);
+                                        console.log(`[x] Tracker atualizado:`, updateTracker.rows);
 
                                         
                                         // Verifica se cliente já está cadastrado no sitema tracker
@@ -349,12 +362,26 @@ async function consumeMessages() {
                 }
             }
         });
+    }
     } catch (error) {
-        console.error('Erro ao conectar com RabbitMQ:', error);
-        // Tenta reconectar após 5 segundos
-        setTimeout(consumeMessages, 5000);
+            console.error('Erro ao conectar com RabbitMQ:', error);
+            // Tenta reconectar após 5 segundos
+            setTimeout(consumeMessages, 5000);
     }
 }
+
+async function CHARSToString(text){
+    // Converte caracteres especiais para formato unicode
+    const convertedText = text.split('').map(char => {
+        const code = char.charCodeAt(0);
+        return code > 127 ? `\\u${code.toString(16).padStart(4, '0')}` : char;
+    }).join('');
+
+    console.log(`[x] Texto Decodificado:`, convertedText);
+    return convertedText;
+}
+
+export { CHARSToString };
 
 // Inicia o consumidor
 consumeMessages();
