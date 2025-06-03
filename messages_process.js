@@ -31,22 +31,69 @@ router.use(cors());
 router.use(morgan('combined'));
 router.use(express.json());
 
-// Configuração do PostgreSQL
-const pool = new Pool({
-    user: process.env.PGUSER || 'postgres',
-    host: process.env.PGHOST || 'localhost',
-    database: process.env.PGDATABASE || 'tracker_db',
-    password: process.env.PGPASSWORD || 'postgres',
-    port: process.env.PGPORT || 5432,
-    max: 200,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-    allowExitOnIdle: true,
-});
+// Configuração do PostgreSQL com reconexão automática
+const createPool = () => {
+    const pool = new Pool({
+        user: process.env.PGUSER || 'postgres',
+        host: process.env.PGHOST || 'localhost',
+        database: process.env.PGDATABASE || 'tracker_db',
+        password: process.env.PGPASSWORD || 'postgres',
+        port: process.env.PGPORT || 5432,
+        max: 200,
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000,
+        allowExitOnIdle: true,
+    });
+
+    pool.on('error', (err, client) => {
+        console.error('Erro inesperado no cliente do pool:', err);
+        if (err.message.includes('Connection terminated')) {
+            console.log('Tentando reconectar ao banco de dados...');
+            setTimeout(() => {
+                try {
+                    client.release(true);
+                } catch (e) {
+                    console.error('Erro ao liberar cliente:', e);
+                }
+                initPool();
+            }, 5000);
+        }
+    });
+
+    return pool;
+};
+
+let pool = createPool();
+
+const initPool = () => {
+    if (pool) {
+        try {
+            pool.end();
+        } catch (e) {
+            console.error('Erro ao encerrar pool existente:', e);
+        }
+    }
+    pool = createPool();
+    
+    // Teste de conexão
+    pool.query('SELECT NOW()', (err) => {
+        if (err) {
+            console.error('Erro ao conectar ao banco de dados:', err);
+            console.log('Tentando reconectar em 5 segundos...');
+            setTimeout(initPool, 5000);
+        } else {
+            console.log('Conexão com o banco de dados estabelecida com sucesso!');
+        }
+    });
+};
+
+// Inicializa a primeira conexão
+initPool();
 
 // Configuração do RabbitMQ
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost';
 const QUEUE_NAME = 'messages.upsert';
+//const QUEUE_NAME = 'evolution.messages.upsert';
 
 // Função para consumir mensagens
 async function consumeMessages() {
@@ -281,6 +328,8 @@ async function consumeMessages() {
                                     }
                                 }
                             }
+                        } else {
+                            console.log(`[x] Instância não cadastrada:`, message.instance);
                         }
 
                         await client.query('COMMIT');
