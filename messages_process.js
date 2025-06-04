@@ -173,13 +173,17 @@ async function consumeMessages() {
                                         console.log(`[x] whatsapp_id:`, message.data.key.remoteJid);
                                         console.log(`[x] business_id:`, queryGetInstance.rows[0].business_id);
                                         console.log(`[x] unique_code:`, messageCoded);
-                                        console.log(`[x] Tracker atualizado:`, updateTracker.rows);
+                                        if(updateTracker.rows.length >= 1){
+                                            console.log(`[x] Tracker atualizado ✅✅✅ :`, updateTracker.rows[0].id);
+                                        } else {
+                                            console.log(`[x] Tracker não atualizado ❌❌❌ :`, updateTracker.rows.length);
+                                        }
 
                                         
                                         // Verifica se cliente já está cadastrado no sitema tracker
                                         const getUser = await client.query(
-                                            `SELECT * FROM tracker_leads WHERE whatsapp_id = $1`,
-                                            [message.data.key.remoteJid]
+                                            `SELECT * FROM tracker_leads WHERE whatsapp_id = $1 AND business_id = $2`,
+                                            [message.data.key.remoteJid, queryGetInstance.rows[0].business_id]
                                         );
 
                                         let userId = "";
@@ -190,6 +194,23 @@ async function consumeMessages() {
                                             
                                             console.log(`[x] Usuário encontrado:`, getUser.rows);
                                             userId = "ID A DEFINIR";
+
+                                            const updateTrackerLead = await client.query(
+                                                `UPDATE tracker SET actual_user_id = $1 WHERE id = $2`,
+                                                [createUser.rows[0].id, updateTracker.rows[0].id]
+                                            );
+
+                                            const updatedUserIdentifierList = [...getUser.rows[0].user_identifier_list, updateTracker.rows[0].user_identifier_id];
+
+                                            const updateTrackerLeadFinal = await client.query(
+                                                `UPDATE tracker_leads SET user_identifier_list = $1 WHERE id = $2 RETURNING *`,
+                                                [updatedUserIdentifierList, getUser.rows[0].id]
+                                            );
+                                            console.log(`[x] Tracker lead lista de ids atualizada:`, updateTrackerLeadFinal.rows);
+
+                                            userId = getUser.rows[0].id;
+                                            userIdentifierListIds = updateTrackerLeadFinal.rows[0].user_identifier_list;
+
                                         } else {
                                             
                                             
