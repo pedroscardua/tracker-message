@@ -6,6 +6,7 @@ require('dotenv').config();
 
 router.get('/:id', async (req, res) => {
     try {
+        let start_time = Date.now();
         let router;
         router = [];
         // verifique se id é uuid
@@ -51,10 +52,16 @@ router.get('/:id', async (req, res) => {
 
         // Depois faz o redirecionamento e retorna
         if (userAgent.includes('facebook')) {
-            return res.redirect('https://www.audracs.com.br');
+            res.redirect('https://www.audracs.com.br');
         } else {
-            return res.redirect(`https://wa.me/${phone_number}?text=${message_complete}`);
+            res.redirect(`https://wa.me/${phone_number}?text=${message_complete}`);
         }
+
+        let end_time = Date.now();
+        let duration = end_time - start_time;
+        console.log(`[x] [TRACKER CLIENT GET DURATION] [${req.params.id}] [${duration}ms]`);    
+
+        return;
 
     } catch (error) {
         console.error('Erro na consulta:', error);
