@@ -96,14 +96,14 @@ async function consumeMessages() {
             if (msg !== null) {
                 try {
                     const message = JSON.parse(msg.content.toString());
-                    console.log(`[x] Recebida mensagem ${message.instance} - ${message.data.key.remoteJid}`);
+                    console.log(Date.now(),`[x] Recebida mensagem ${message.instance} - ${message.data.key.remoteJid}`);
 
                     // Aqui você pode processar a mensagem conforme necessário
                     // Por exemplo, salvar no banco de dados
                     const client = await pool.getClient();
                     try {
                         if (message.data.messageType !== 'conversation' || message.data.key.fromMe === true) {
-                            // console.log(`[x] Tipo de mensagem não é uma conversa ou recebida por mim:`, message.data.messageType, ` - `, message.data.key.fromMe);
+                            console.log(`[x] 📷 Tipo de mensagem não é uma conversa ou recebida: Type: ${message.data.messageType} - FromMe: ${message.data.key.fromMe}`);
                             channel.ack(msg);
                             return;
                         }
@@ -130,7 +130,7 @@ async function consumeMessages() {
                                 );
                                 // se tem rota criada exatamente com a mesma mensagem continua - Se não busca todas rotas e verifica se mensagem recebida contem alguma das rotas
                                 if (queryTracker.rows.length !== 0) {
-                                    console.log(`[x] Tracker encontrada:`, queryTracker.rows[0].id);
+                                    console.log(Date.now(),`[x] Tracker encontrada:`, queryTracker.rows[0].id);
                                     // Confere se as mensagens são realmente iguais
                                     if (unicode === queryTracker.rows[0].unicode){
                                         // console.log(`[x] Mensagem corresponde ao unicode:`, unicode);
@@ -141,9 +141,9 @@ async function consumeMessages() {
                                         );
                                         
                                         if(updateTracker.rows.length >= 1){
-                                            console.log(`[x] Tracker atualizado ✅✅✅ :`, updateTracker.rows[0].id);
+                                            console.log(Date.now(),`[x] Tracker atualizado ✅✅✅ :`, updateTracker.rows[0].id);
                                         } else {
-                                            console.log(`[x] Tracker não atualizado ❌❌❌ :`, updateTracker.rows.length);
+                                            console.log(Date.now(),`[x] Tracker não atualizado ❌❌❌ :`, updateTracker.rows.length);
                                         }
 
                                         
@@ -191,7 +191,7 @@ async function consumeMessages() {
                                             // userIdentifierListIds = updateTrackerLeadFinal.rows[0].user_identifier_list;
                                             userIdentifierListIds = [getUser.rows[0].id];
 
-                                            console.log(`[x] Tracker lead atualizado ✅ :`, getUser.rows[0].id);
+                                            console.log(Date.now(),`[x] Tracker lead atualizado ✅ :`, getUser.rows[0].id);
 
                                         } else {
                                             
@@ -202,19 +202,20 @@ async function consumeMessages() {
                                             const userIdentifierList = []
                                             // Cria usuário com os dados recebidos do whatsapp e adiciona na lista o ID inicial usado para definir esse user
                                             const createUser = await client.query(
-                                                `INSERT INTO tracker_leads (whatsapp_id,business_id,fullname, user_identifier_list, last_client_ip_address, client_ip_address_list, last_client_user_agent, client_user_agent_list) 
-                                                 VALUES ($1,$2,$3,$4,$5,ARRAY[$5]::text[],$6,ARRAY[$6]::text[]) RETURNING *`,
+                                                `INSERT INTO tracker_leads (whatsapp_id,business_id,fullname, user_identifier_list, last_client_ip_address, client_ip_address_list, last_client_user_agent, client_user_agent_list, first_tracker) 
+                                                 VALUES ($1,$2,$3,$4,$5,ARRAY[$5]::text[],$6,ARRAY[$6]::text[],$7) RETURNING *`,
                                                 [message.data.key.remoteJid, 
                                                  queryGetInstance.rows[0].business_id, 
                                                  message.data.pushName.replaceAll(emojis, ''), 
                                                  userIdentifierList, 
                                                  updateTracker.rows[0].client_ip_address,
-                                                 updateTracker.rows[0].client_user_agent]
+                                                 updateTracker.rows[0].client_user_agent,
+                                                 queryTracker.rows[0].id]
                                             );
                                             // console.log(`[x] Usuário criado:`, createUser.rows);
                                             // Atualiza tracker passando o ID oficial do user apos receber mensagem e criar user
                                             const updateTrackerLead = await client.query(
-                                                `UPDATE tracker SET actual_user_id = $1 WHERE id = $2`,
+                                                `UPDATE tracker SET actual_lead_id = $1 WHERE id = $2`,
                                                 [createUser.rows[0].id, updateTracker.rows[0].id]
                                             );
                                             // Pega o ID oficial do usuario criado e adiciona na lista de ids que identificam esse user
@@ -228,9 +229,9 @@ async function consumeMessages() {
                                             userId = createUser.rows[0].id;
                                             userIdentifierListIds = [createUser.rows[0].id];
 
-                                            console.log(`[x] Lead Criado userId ✅ :`, userId);
+                                            console.log(Date.now(),`[x] Lead Criado userId ✅ :`, userId);
                                         }
-                                        console.log(`[x] Done ✅ :`, updateTracker.rows[0].id);
+                                        console.log(Date.now(),`[x] Done ✅ :`, updateTracker.rows[0].id);
 
                                         const queryRouter = await client.query(
                                             `SELECT * FROM router_tracker WHERE id = $1 AND business_id = $2`,
@@ -244,6 +245,7 @@ async function consumeMessages() {
                                                 "tracker_id": queryTracker.rows[0].id
                                             }
                                             const messageIntegrationString = JSON.stringify(messageIntegration);
+                                            await client.query('COMMIT');
                                             channel.sendToQueue(QUEUE_NAME_INTEGRATION, Buffer.from(messageIntegrationString));
                                             console.log(`[x] Processo adicionado na fila ${QUEUE_NAME_INTEGRATION}`);
                                         } else {
@@ -255,6 +257,7 @@ async function consumeMessages() {
                                             const messageIntegrationSource = {
                                                 "tracker_id": queryTracker.rows[0].id
                                             }
+                                            await client.query('COMMIT');
                                             const messageIntegrationSourceString = JSON.stringify(messageIntegrationSource);
                                             channel.sendToQueue(QUEUE_NAME_SOURCE, Buffer.from(messageIntegrationSourceString));
                                             console.log(`[x] Processo adicionado na fila ${QUEUE_NAME_SOURCE}`);
@@ -262,7 +265,14 @@ async function consumeMessages() {
                                     }
                                     
                                 } else {
-                                    console.log(`[x] Tracker não encontrada:`, unicode);
+                                    console.log(Date.now(),`[x] Tracker não encontrada:`, unicode);
+                                    if (message.data.message.conversation.includes("melasma")){
+                                        console.log(Date.now(),`⚠️ ‼️ 🚨 [x] Mensagem contém "melasma" Mas tracker não encontrada. Mensagem: `, message.data.message.conversation);
+                                    }
+                                    let unicodeDecoded = decodeURIComponent(unicode);
+                                    console.log(Date.now(),`[x] Unicode decodificado:`, unicodeDecoded);
+                                    console.log(Date.now(),`[x] Unicode length:`, unicode.length);
+                                    console.log(Date.now(),`[x] Unicode decodificado length:`, unicodeDecoded.length);
                                     // const queryAllRouterTracker = await client.query(
                                     //     `SELECT * FROM router_tracker WHERE business_id = $1`,
                                     //     [queryGetInstance.rows[0].business_id]
@@ -278,7 +288,7 @@ async function consumeMessages() {
                                 }
                             }
                         } else {
-                            console.log(`[x] Instância não cadastrada:`, message.instance);
+                            console.log(Date.now(),`[x] Instância não cadastrada:`, message.instance);
                             channel.ack(msg);
                             return;
                         }

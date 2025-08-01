@@ -1,30 +1,28 @@
-# use the official Bun image
-# see all versions at https://hub.docker.com/r/oven/bun/tags
-FROM imbios/bun-node:latest AS base
+# Use a imagem oficial do Node.js
+FROM node:20-alpine AS base
 WORKDIR /usr/src/app
 
-# install dependencies into temp directory
-# this will cache them and speed up future builds
+# Instalar dependências em diretório temporário
 FROM base AS install
 RUN mkdir -p /temp/dev
-COPY package.json .env /temp/dev/
-RUN cd /temp/dev && bun install
+COPY package.json package-lock.json /temp/dev/
+RUN cd /temp/dev && npm ci
 
-# install with --production (exclude devDependencies)
+# Instalar dependências de produção
 RUN mkdir -p /temp/prod
-COPY package.json .env /temp/prod/
-RUN cd /temp/prod && bun install --production
+COPY package.json package-lock.json /temp/prod/
+RUN cd /temp/prod && npm ci --only=production
 
-# if erro: rm bun.lockb
-# after: bun install
-
-
-# copy production dependencies and source code into final image
+# Copiar dependências de produção e código fonte para a imagem final
 FROM base AS release
 ENV NODE_ENV=production
+
+# Copiar arquivos do projeto
 COPY --from=install /temp/prod/node_modules node_modules
 COPY . .
-COPY .env .
-ENV BUN_JSC_forceRAMSize="1073741"
 
-ENTRYPOINT [ "bun", "run", "--smol", "/usr/src/app/index.js" ]
+# Expor a porta (adicione a porta que seu aplicativo usa)
+EXPOSE 3000
+
+# Comando para iniciar o aplicativo
+CMD ["node", "src/server.js"]

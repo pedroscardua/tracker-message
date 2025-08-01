@@ -1,0 +1,75 @@
+[
+    {
+        "id": "update_inventory_table",
+        "type": "ui_table",
+        "z": "main_flow",
+        "group": "inventory_group",
+        "name": "Inventory Table",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "columns": [
+            {
+                "field": "uid",
+                "title": "UID",
+                "width": "",
+                "align": "left"
+            },
+            {
+                "field": "product_name",
+                "title": "Produto",
+                "width": "",
+                "align": "left"
+            },
+            {
+                "field": "quantity",
+                "title": "Qtd",
+                "width": "",
+                "align": "center"
+            },
+            {
+                "field": "min_stock",
+                "title": "Mín",
+                "width": "",
+                "align": "center"
+            },
+            {
+                "field": "status",
+                "title": "Status",
+                "width": "",
+                "align": "center"
+            },
+            {
+                "field": "last_scan",
+                "title": "Último Scan",
+                "width": "",
+                "align": "left"
+            }
+        ],
+        "outputs": 0,
+        "cts": false,
+        "x": 600,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "inventory_group",
+        "type": "ui_group",
+        "name": "Inventário",
+        "tab": "main_tab",
+        "order": 1,
+        "disp": true,
+        "width": "12",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "main_tab",
+        "type": "ui_tab",
+        "name": "Dashboard Principal",
+        "icon": "dashboard",
+        "order": 1,
+        "disabled": false,
+        "hidden": false
+    }
+]

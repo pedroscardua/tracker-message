@@ -44,13 +44,17 @@ router.get('/:id', async (req, res) => {
         let unicode;
         unicode = await UnicodeForTracker(create_tracker.id);
         
-        let message_complete = unicode + message;
+        let message_complete = message.charAt(0) + unicode + message.slice(1);
 
-        const redirect_url = `https://wa.me/${phone_number}?text=${message_complete}`;
-        res.redirect(redirect_url);
+        // Primeiro atualiza o tracker
+        await updateTracker(create_tracker.id, phone_number, message, message_complete);
 
-        let update_tracker;
-        update_tracker = await updateTracker(create_tracker.id, phone_number, message,message_complete );
+        // Depois faz o redirecionamento e retorna
+        if (userAgent.includes('facebook')) {
+            return res.redirect('https://www.audracs.com.br');
+        } else {
+            return res.redirect(`https://wa.me/${phone_number}?text=${message_complete}`);
+        }
 
     } catch (error) {
         console.error('Erro na consulta:', error);

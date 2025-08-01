@@ -4,7 +4,15 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const { consumeMessages } = require('./process/process_messages');
 const { consumeMessagesIntegration } = require('./process/process_integration');
-require('dotenv').config();
+
+// Carrega .env apenas em desenvolvimento
+if (process.env.NODE_ENV !== 'production') {
+    try {
+        require('dotenv').config();
+    } catch (error) {
+        console.log('Arquivo .env não encontrado, usando variáveis de ambiente do sistema');
+    }
+}
 
 const app = express();
 const trackerRoutes = require('./recive_tracker');
