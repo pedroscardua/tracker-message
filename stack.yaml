@@ -1,0 +1,45 @@
+version: '3.7'
+
+services:
+  api_tracker_message:
+    image: pedroscardua/tracker-message:24
+    restart: always
+    environment:
+      - PROCESS_MESSAGES=true
+      - DEBUG=false
+      - TIMEZONE=America/Sao_Paulo
+      - CORS_ORIGIN=["http://localhost:3000", "https://app.audracs.com.br","https://api.tracker.audracs.com.br","https://tracker.audracs.com.br"]
+      - PORT=3000
+      - PGUSER=postgres.achfykeerrpbvzbkyasq
+      - PGHOST=aws-0-sa-east-1.pooler.supabase.com
+      - PGDATABASE=postgres
+      - PGPASSWORD=32222818Sox21@$$$$$$@$$$$$$
+      - PGPORT=6543
+      - RABBITMQ_URL=amqp://c8Pge54DyiQAcwx62:0GriQQ4c35T42zamDuAlNcTmzQH3aCgrw9XR@mqq.manager01.audracs.com.br:5672/default
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      update_config:
+        parallelism: 1        # Atualiza um container por vez
+        delay: 10s            # Aguarda 10 segundos entre atualizações
+        order: start-first     # Inicia o novo container antes de remover o antigo
+        failure_action: rollback  # Em caso de erro, reverte para a versão anterior
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.api_tracker_message.rule=Host(`api.tracker.audracs.com.br`)
+        - traefik.http.routers.api_tracker_message.entrypoints=websecure
+        - traefik.http.services.api_tracker_message.loadbalancer.sticky=true
+        - traefik.http.routers.api_tracker_message.tls.certresolver=letsencryptresolver
+        - traefik.http.services.api_tracker_message.loadbalancer.server.port=3000
+        - traefik.http.services.api_tracker_message.loadbalancer.passHostHeader=true
+    networks:
+      - network_public
+      
+networks:
+  network_public:
+    external: true

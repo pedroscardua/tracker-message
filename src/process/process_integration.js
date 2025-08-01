@@ -13,6 +13,7 @@ if (result.error) {
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://localhost';
 const QUEUE_NAME_INTEGRATION = 'tracker_process_integration';
 const PREFETCH_COUNT = process.env.RABBITMQ_PREFETCH_COUNT || 1000;
+//const QUEUE_LIMIT_ENABLED = process.env.QUEUE_LIMIT_ENABLED || false;
 
 // Variáveis globais para gerenciamento da conexão
 let connection = null;
@@ -100,15 +101,27 @@ async function consumeMessagesIntegration(){
                 attemptReconnection();
             }
         });
-
+        const QUEUE_LIMIT_ENABLED = false;
         // Declara a fila com configurações de durabilidade
-        await channel.assertQueue(QUEUE_NAME_INTEGRATION, {
-            durable: true,
-            arguments: {
-                'x-queue-type': 'quorum', // Usa quorum queue para maior confiabilidade
-                'x-delivery-limit': 3 // Máximo de 3 tentativas de entrega
-            }
-        });
+        console.log(`[INTEGRATION] Declarando fila ${QUEUE_NAME_INTEGRATION} com configurações: ${QUEUE_LIMIT_ENABLED ? 'com limite de entrega' : 'sem limite de entrega'}`);
+        if(QUEUE_LIMIT_ENABLED){
+            await channel.assertQueue(QUEUE_NAME_INTEGRATION, {
+                durable: true,
+                arguments:{
+                    'x-queue-type': 'quorum',
+                    'x-delivery-limit': 3
+                }
+            });
+
+        } else {
+            
+            await channel.assertQueue(QUEUE_NAME_INTEGRATION, {
+                durable: true,
+                arguments:{
+                    'x-queue-type': 'quorum'
+                }
+            });
+        }
 
         console.log(`[x] Consumindo mensagens da fila ${QUEUE_NAME_INTEGRATION}`);
 
@@ -169,7 +182,11 @@ async function consumeMessagesIntegration(){
                 } catch (error) {
                     console.error('[INTEGRATION] Erro ao processar mensagem:', error);
                     // Rejeita a mensagem em caso de erro
-                    channel.nack(msg, false, false);
+                    if(QUEUE_LIMIT_ENABLED){
+                        channel.nack(msg, false, false);
+                    }else{
+                        channel.ack(msg);
+                    }
                 }
             }
         });
