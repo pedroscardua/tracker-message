@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const path = require('path');
 const { consumeMessages } = require('./process/process_messages');
 const { consumeMessagesIntegration } = require('./process/process_integration');
 
@@ -19,9 +20,22 @@ const trackerRoutes = require('./recive_tracker');
 
 // Middlewares
 app.use(cors());
-app.use(helmet());
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"], // Permite CSS inline
+            imgSrc: ["'self'", "data:", "https:"],
+            connectSrc: ["'self'"]
+        }
+    }
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Servir arquivos estáticos
+app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // Rota básica de teste
 app.get('/', (req, res) => {

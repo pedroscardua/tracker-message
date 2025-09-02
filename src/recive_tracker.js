@@ -1,10 +1,24 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
 const { validate: uuidValidate } = require('uuid');
 const { queryTrackerByCustomURL, queryTrackerByUuid, PhoneNumberForTracker, MessageForTracker, UnicodeForTracker, createTracker, updateTracker } = require('./functions');
 require('dotenv').config();
 
+// Endpoint principal - serve a página de loading instantaneamente
 router.get('/:id', async (req, res) => {
+    try {
+        // Serve a página de loading imediatamente
+        const loadingPath = path.join(__dirname, '..', 'public', 'loading.html');
+        res.sendFile(loadingPath);
+    } catch (error) {
+        console.error('Erro ao servir página de loading:', error);
+        res.status(500).json({ message: 'Erro interno do servidor' });
+    }
+});
+
+// Endpoint para processamento em background
+router.get('/:id/process', async (req, res) => {
     try {
         let start_time = Date.now();
         let router;
@@ -50,18 +64,23 @@ router.get('/:id', async (req, res) => {
         // Primeiro atualiza o tracker
         await updateTracker(create_tracker.id, phone_number, message, message_complete);
 
-        // Depois faz o redirecionamento e retorna
+        // Retorna a URL de redirecionamento como JSON
+        let redirectUrl;
         if (userAgent.includes('facebook')) {
-            res.redirect('https://www.audracs.com.br');
+            redirectUrl = 'https://www.audracs.com.br';
         } else {
-            res.redirect(`https://wa.me/${phone_number}?text=${message_complete}`);
+            redirectUrl = `https://wa.me/${phone_number}?text=${encodeURIComponent(message_complete)}`;
         }
 
         let end_time = Date.now();
         let duration = end_time - start_time;
         console.log(`[x] [TRACKER CLIENT GET DURATION] [${req.params.id}] [${duration}ms]`);    
 
-        return;
+        return res.json({ 
+            success: true, 
+            redirect: redirectUrl,
+            duration: duration 
+        });
 
     } catch (error) {
         console.error('Erro na consulta:', error);
